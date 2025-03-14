@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tempo files
+**/tempobook/dynamic/
+**/tempobook/storyboards/
