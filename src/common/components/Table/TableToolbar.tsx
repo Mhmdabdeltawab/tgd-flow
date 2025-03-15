@@ -1,14 +1,14 @@
-import React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
-import Button from '../Button/Button';
-import Search from '../Search/Search';
-import FiltersButton from '../Filters/FiltersButton';
+import React from "react";
+import { SlidersHorizontal } from "lucide-react";
+import Button from "../Button/Button";
+import Search from "../Search/Search";
+import FiltersButton from "../Filters/FiltersButton";
 
 interface TableToolbarAction {
   icon: React.ElementType;
   label: string;
   onClick: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: "primary" | "secondary" | "ghost";
   className?: string;
 }
 
@@ -54,7 +54,7 @@ export default function TableToolbar({
           {mainAction && (
             <Button
               icon={mainAction.icon}
-              variant={mainAction.variant || 'secondary'}
+              variant={mainAction.variant || "secondary"}
               onClick={mainAction.onClick}
               className={mainAction.className}
             >
@@ -81,17 +81,24 @@ export default function TableToolbar({
             {/* Visible Secondary Actions */}
             {secondaryActions.map((action, index) => (
               <Button
-                key={index}
+                key={`secondary-action-${index}`}
                 icon={action.icon}
-                variant={action.variant || 'ghost'}
+                variant={action.variant || "ghost"}
                 onClick={action.onClick}
-                className={`px-3 py-2 ${action.className || ''}`}
+                className={`px-3 py-2 ${action.className || ""}`}
               >
                 {action.label}
               </Button>
             ))}
 
-            {customActions}
+            {React.Children.map(customActions, (child, index) => {
+              if (React.isValidElement(child)) {
+                return React.cloneElement(child, {
+                  key: `custom-action-${index}`,
+                });
+              }
+              return child;
+            })}
           </div>
 
           {/* Right side actions */}
