@@ -68,22 +68,11 @@ const useSupabaseAuthStore = create<AuthState>(
               .eq("user_id", adminUser.id)
               .single();
 
-          if (permissionsError) {
-            throw new Error(
-              "Failed to load user permissions. Please contact support.",
-            );
-          }
+          // Use default admin permissions if none found
+          let userPermissions = adminPermissions;
 
-          // Set admin permissions
-          const permissions = adminPermissions;
-
-          const userData: User = {
-            id: adminUser.id,
-            email: adminUser.email,
-            name: adminUser.name,
-            photoURL: adminUser.photo_url || undefined,
-            role: adminUser.role,
-            permissions: {
+          if (!permissionsError && permissionsData) {
+            userPermissions = {
               dashboard: permissionsData.dashboard,
               contracts: permissionsData.contracts,
               routing: permissionsData.routing,
@@ -96,7 +85,16 @@ const useSupabaseAuthStore = create<AuthState>(
               storageTanks: permissionsData.storage_tanks,
               analytics: permissionsData.analytics,
               userManagement: permissionsData.user_management,
-            },
+            };
+          }
+
+          const userData: User = {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            photoURL: adminUser.photo_url || undefined,
+            role: adminUser.role,
+            permissions: userPermissions,
             createdAt: new Date(adminUser.created_at),
             updatedAt: new Date(adminUser.updated_at),
           };
@@ -172,20 +170,43 @@ const useSupabaseAuthStore = create<AuthState>(
           const users: User[] = usersData.map((userData) => {
             const permissionsData = permissionsMap[userData.id];
 
-            const permissions = permissionsData || {
-              dashboard: { view: true, edit: false, delete: false },
-              contracts: { view: false, edit: false, delete: false },
-              routing: { view: false, edit: false, delete: false },
-              shipments: { view: false, edit: false, delete: false },
-              suppliers: { view: false, edit: false, delete: false },
-              tanks: { view: false, edit: false, delete: false },
-              buyers: { view: false, edit: false, delete: false },
-              warehouses: { view: false, edit: false, delete: false },
-              terminals: { view: false, edit: false, delete: false },
-              storage_tanks: { view: false, edit: false, delete: false },
-              analytics: { view: false, edit: false, delete: false },
-              user_management: { view: false, edit: false, delete: false },
-            };
+            // Default permissions based on role
+            const defaultPerms =
+              userData.role === "admin"
+                ? adminPermissions
+                : {
+                    dashboard: { view: true, edit: false, delete: false },
+                    contracts: { view: false, edit: false, delete: false },
+                    routing: { view: false, edit: false, delete: false },
+                    shipments: { view: false, edit: false, delete: false },
+                    suppliers: { view: false, edit: false, delete: false },
+                    tanks: { view: false, edit: false, delete: false },
+                    buyers: { view: false, edit: false, delete: false },
+                    warehouses: { view: false, edit: false, delete: false },
+                    terminals: { view: false, edit: false, delete: false },
+                    storageTanks: { view: false, edit: false, delete: false },
+                    analytics: { view: false, edit: false, delete: false },
+                    userManagement: { view: false, edit: false, delete: false },
+                  };
+
+            // Use permissions from database or defaults
+            let permissions = defaultPerms;
+            if (permissionsData) {
+              permissions = {
+                dashboard: permissionsData.dashboard,
+                contracts: permissionsData.contracts,
+                routing: permissionsData.routing,
+                shipments: permissionsData.shipments,
+                suppliers: permissionsData.suppliers,
+                tanks: permissionsData.tanks,
+                buyers: permissionsData.buyers,
+                warehouses: permissionsData.warehouses,
+                terminals: permissionsData.terminals,
+                storageTanks: permissionsData.storage_tanks,
+                analytics: permissionsData.analytics,
+                userManagement: permissionsData.user_management,
+              };
+            }
 
             return {
               id: userData.id,
@@ -193,20 +214,7 @@ const useSupabaseAuthStore = create<AuthState>(
               name: userData.name,
               photoURL: userData.photo_url || undefined,
               role: userData.role,
-              permissions: {
-                dashboard: permissions.dashboard,
-                contracts: permissions.contracts,
-                routing: permissions.routing,
-                shipments: permissions.shipments,
-                suppliers: permissions.suppliers,
-                tanks: permissions.tanks,
-                buyers: permissions.buyers,
-                warehouses: permissions.warehouses,
-                terminals: permissions.terminals,
-                storageTanks: permissions.storage_tanks,
-                analytics: permissions.analytics,
-                userManagement: permissions.user_management,
-              },
+              permissions: permissions,
               createdAt: new Date(userData.created_at),
               updatedAt: new Date(userData.updated_at),
             };
@@ -473,23 +481,55 @@ const initializeAuth = async () => {
 // Initialize auth on app load
 initializeAuth();
 
-// Set up session expiration check - 10 minutes (600000 ms)
+// Track user activity
+let lastActivityTime = new Date();
+const activityEvents = [
+  "mousedown",
+  "keydown",
+  "mousemove",
+  "touchstart",
+  "scroll",
+];
+
+// Update last activity time when user interacts with the page
+activityEvents.forEach((eventType) => {
+  window.addEventListener(
+    eventType,
+    () => {
+      lastActivityTime = new Date();
+
+      // Also update the stored user's updatedAt time to prevent expiration while active
+      const storedUser = localStorage.getItem("demo-admin-user");
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        userData.lastActivity = lastActivityTime.toISOString();
+        localStorage.setItem("demo-admin-user", JSON.stringify(userData));
+      }
+    },
+    true,
+  );
+});
+
+// Set up session expiration check - 10 minutes (600000 ms) of inactivity
 setInterval(() => {
   const storedUser = localStorage.getItem("demo-admin-user");
   if (storedUser) {
     const userData = JSON.parse(storedUser);
     const now = new Date();
-    const loginTime = new Date(userData.updatedAt);
+    const lastActivity = userData.lastActivity
+      ? new Date(userData.lastActivity)
+      : new Date(userData.updatedAt);
 
-    // If more than 10 minutes have passed, log out
-    if (now.getTime() - loginTime.getTime() > 600000) {
-      console.log("Session expired after 10 minutes");
+    // If more than 10 minutes have passed since last activity, log out
+    if (now.getTime() - lastActivity.getTime() > 600000) {
+      console.log("Session expired after 10 minutes of inactivity");
       localStorage.removeItem("demo-admin-user");
       useSupabaseAuthStore.setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: "Your session has expired. Please log in again.",
+        error:
+          "Your session has expired due to inactivity. Please log in again.",
       });
 
       // Redirect to login page

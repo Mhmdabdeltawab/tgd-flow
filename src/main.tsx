@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { errorService } from "./common/services/errorService";
 import "./index.css";
+import "./common/stores/supabaseStoreUtils";
 
 // Import the dev tools and initialize them
 import { TempoDevtools } from "tempo-devtools";

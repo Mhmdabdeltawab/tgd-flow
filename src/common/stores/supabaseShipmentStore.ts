@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { supabase } from "../services/supabaseClient";
 import { Shipment } from "../types/shipment";
 import useSupabaseAuthStore from "./supabaseAuthStore";
+import { logSupabaseError } from "./supabaseStoreUtils";
 
 interface ShipmentState {
   getAll: () => Promise<Shipment[]>;
@@ -18,12 +19,31 @@ interface ShipmentState {
 const useSupabaseShipmentStore = create<ShipmentState>(() => ({
   getAll: async () => {
     try {
+      // First check if the table exists and has data
+      const { count, error: countError } = await supabase
+        .from("shipments")
+        .select("*", { count: "exact", head: true });
+
+      if (countError) {
+        logSupabaseError(`checking shipments table`, countError);
+        return [];
+      }
+
+      // If no data, return empty array
+      if (count === 0) {
+        console.log(`No shipments found in database`);
+        return [];
+      }
+
       const { data, error } = await supabase
         .from("shipments")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError("fetching shipments", error);
+        return [];
+      }
 
       return data.map(mapShipmentFromSupabase);
     } catch (error) {
@@ -42,7 +62,8 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
 
       if (error) {
         if (error.code === "PGRST116") return undefined; // No rows returned
-        throw error;
+        logSupabaseError(`fetching shipment ${id}`, error);
+        return undefined;
       }
 
       return mapShipmentFromSupabase(data);
@@ -60,7 +81,13 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
         .eq("contract_id", contractId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError(
+          `fetching shipments for contract ${contractId}`,
+          error,
+        );
+        return [];
+      }
 
       return data.map(mapShipmentFromSupabase);
     } catch (error) {
@@ -95,7 +122,10 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError("creating shipment", error);
+        throw error;
+      }
 
       return mapShipmentFromSupabase(newShipment);
     } catch (error) {
@@ -136,7 +166,10 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError(`updating shipment ${id}`, error);
+        throw error;
+      }
 
       return mapShipmentFromSupabase(updatedShipment);
     } catch (error) {
@@ -158,7 +191,10 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
         })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError(`updating shipment quality ${id}`, error);
+        throw error;
+      }
     } catch (error) {
       console.error(`Error updating shipment quality ${id}:`, error);
       throw error;
@@ -169,7 +205,10 @@ const useSupabaseShipmentStore = create<ShipmentState>(() => ({
     try {
       const { error } = await supabase.from("shipments").delete().eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        logSupabaseError(`deleting shipment ${id}`, error);
+        throw error;
+      }
     } catch (error) {
       console.error(`Error deleting shipment ${id}:`, error);
       throw error;

@@ -24,24 +24,22 @@ const useUserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      // Add a small delay to prevent UI freezing
-      setTimeout(async () => {
-        try {
-          const allUsers = await getAllUsers();
-          setUsers(allUsers);
-          setLoading(false);
-        } catch (error) {
-          console.error("Error fetching users:", error);
-          showToast({
-            type: "error",
-            title: "Error",
-            message: "Failed to load users. Please try again.",
-          });
-          setLoading(false);
-        }
-      }, 100);
+      // Direct fetch without setTimeout to avoid async issues
+      const allUsers = await getAllUsers();
+      if (Array.isArray(allUsers)) {
+        setUsers(allUsers);
+      } else {
+        console.warn("getAllUsers did not return an array", allUsers);
+        setUsers([]);
+      }
     } catch (error) {
-      console.error("Error in fetchUsers:", error);
+      console.error("Error fetching users:", error);
+      showToast({
+        type: "error",
+        title: "Error",
+        message: "Failed to load users. Please try again.",
+      });
+    } finally {
       setLoading(false);
     }
   }, [getAllUsers, showToast]);
