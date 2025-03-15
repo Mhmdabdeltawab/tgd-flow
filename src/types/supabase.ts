@@ -485,7 +485,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      pgrest: {
+        Args: {
+          query: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

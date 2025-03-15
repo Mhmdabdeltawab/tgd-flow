@@ -23,7 +23,44 @@ export const useRlsStatus = () => {
   useEffect(() => {
     const checkRlsStatus = async () => {
       try {
-        const { data, error } = await supabase.rpc("pgrest", {
+        console.log("Checking RLS status...");
+
+        // First, check if the pgrest function exists
+        const { data: functionExists, error: functionCheckError } =
+          await supabase
+            .from("pg_proc")
+            .select("proname")
+            .eq("proname", "pgrest")
+            .maybeSingle();
+
+        if (functionCheckError) {
+          console.error(
+            "Error checking if pgrest function exists:",
+            functionCheckError,
+          );
+          setStatus({
+            isEnabled: false,
+            tables: [],
+            loading: false,
+            error: `Error checking if pgrest function exists: ${functionCheckError.message}`,
+          });
+          return;
+        }
+
+        if (!functionExists) {
+          console.error("pgrest function does not exist");
+          setStatus({
+            isEnabled: false,
+            tables: [],
+            loading: false,
+            error:
+              "pgrest function does not exist. Please run the latest migration.",
+          });
+          return;
+        }
+
+        // Now try to use the pgrest function
+        const { data: result, error: rpcError } = await supabase.rpc("pgrest", {
           query: `
             WITH table_rls AS (
               SELECT 
@@ -54,26 +91,58 @@ export const useRlsStatus = () => {
           `,
         });
 
-        if (error) {
-          console.error("Error checking RLS status:", error);
+        if (rpcError) {
+          console.error("RPC error checking RLS status:", rpcError);
           setStatus({
             isEnabled: false,
             tables: [],
             loading: false,
-            error: error.message,
+            error: `RPC error: ${rpcError.message}`,
+          });
+          return;
+        }
+
+        if (result && result.error) {
+          console.error("pgrest function returned an error:", result.error);
+          setStatus({
+            isEnabled: false,
+            tables: [],
+            loading: false,
+            error: `pgrest error: ${result.error}`,
+          });
+          return;
+        }
+
+        // Success case - result should be a JSON array
+        console.log("RLS status result:", result);
+
+        if (!Array.isArray(result)) {
+          console.error("Unexpected result format:", result);
+          setStatus({
+            isEnabled: false,
+            tables: [],
+            loading: false,
+            error: `Unexpected result format: ${JSON.stringify(result)}`,
           });
           return;
         }
 
         // Process the data
-        const tables = data.map((row: any) => ({
+        const tables = result.map((row) => ({
           name: row.table_name,
           hasRls: row.has_rls,
-          policies: row.policies,
+          policies: row.policies || [],
         }));
 
         // Check if users table has RLS enabled
-        const usersTable = tables.find((t: any) => t.name === "users");
+        const usersTable = tables.find((t) => t.name === "users");
+        const userPermissionsTable = tables.find(
+          (t) => t.name === "user_permissions",
+        );
+
+        console.log("Users table:", usersTable);
+        console.log("User permissions table:", userPermissionsTable);
+
         const isEnabled = usersTable ? usersTable.hasRls : false;
 
         setStatus({
@@ -88,7 +157,7 @@ export const useRlsStatus = () => {
           isEnabled: false,
           tables: [],
           loading: false,
-          error: error.message,
+          error: `Unexpected error: ${error.message}`,
         });
       }
     };

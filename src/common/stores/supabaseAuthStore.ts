@@ -15,6 +15,7 @@ interface AuthState {
   isInitialized: boolean;
   isAuthenticated: boolean;
   login: () => Promise<void>;
+  loginWithEmail: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   getAllUsers: () => Promise<User[]>;
   addUser: (
@@ -41,22 +42,31 @@ const useSupabaseAuthStore = create<AuthState>(
       login: async () => {
         set({ isLoading: true, error: null });
         try {
-          // For demo purposes, we'll automatically log in with a predefined admin account
-          // In a real app, this would use the Google authentication flow
+          // Default to admin email for backward compatibility
+          await get().loginWithEmail("abdeltawab@tagaddod.com");
+        } catch (error: any) {
+          console.error("Login error:", error);
+          set({
+            isLoading: false,
+            error: error.message || "Failed to login. Please try again.",
+            isAuthenticated: false,
+          });
+        }
+      },
 
-          // Check if the email is abdeltawab@tagaddod.com and make them admin
-          const email = "abdeltawab@tagaddod.com";
-
-          // Fetch the admin user from Supabase
-          const { data: adminUser, error: adminError } = await supabase
+      loginWithEmail: async (email: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          // Fetch the user from Supabase
+          const { data: userData, error: userError } = await supabase
             .from("users")
             .select("*")
             .eq("email", email)
             .single();
 
-          if (adminError) {
+          if (userError) {
             throw new Error(
-              "Failed to find admin user. Please contact support.",
+              "User not found. Please check your email or contact support.",
             );
           }
 
@@ -65,11 +75,12 @@ const useSupabaseAuthStore = create<AuthState>(
             await supabase
               .from("user_permissions")
               .select("*")
-              .eq("user_id", adminUser.id)
+              .eq("user_id", userData.id)
               .single();
 
-          // Use default admin permissions if none found
-          let userPermissions = adminPermissions;
+          // Use default permissions based on role
+          let userPermissions =
+            userData.role === "admin" ? adminPermissions : defaultPermissions;
 
           if (!permissionsError && permissionsData) {
             userPermissions = {
@@ -88,22 +99,22 @@ const useSupabaseAuthStore = create<AuthState>(
             };
           }
 
-          const userData: User = {
-            id: adminUser.id,
-            email: adminUser.email,
-            name: adminUser.name,
-            photoURL: adminUser.photo_url || undefined,
-            role: adminUser.role,
+          const user: User = {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            photoURL: userData.photo_url || undefined,
+            role: userData.role,
             permissions: userPermissions,
-            createdAt: new Date(adminUser.created_at),
-            updatedAt: new Date(adminUser.updated_at),
+            createdAt: new Date(userData.created_at),
+            updatedAt: new Date(userData.updated_at),
           };
 
           // Store in localStorage for persistence
-          localStorage.setItem("demo-admin-user", JSON.stringify(userData));
+          localStorage.setItem("demo-admin-user", JSON.stringify(user));
 
           set({
-            user: userData,
+            user,
             isLoading: false,
             isAuthenticated: true,
             isInitialized: true,

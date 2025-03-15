@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useSupabaseAuthStore from "../../stores/supabaseAuthStore";
-import { Box } from "lucide-react";
+import { Mail } from "lucide-react";
 import Button from "../Button/Button";
 import LoadingScreen from "./LoadingScreen";
 
 const LoginPage: React.FC = () => {
-  const { login, isAuthenticated, error, isLoading, isInitialized } =
+  const { loginWithEmail, isAuthenticated, error, isLoading, isInitialized } =
     useSupabaseAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>("");
 
   // Get the return URL from location state or default to dashboard
   const from = (location.state as any)?.from?.pathname || "/dashboard";
@@ -29,8 +30,18 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async () => {
     setLoginError(null);
+    if (!email.trim()) {
+      setLoginError("Please enter your email address");
+      return;
+    }
+
+    if (!email.endsWith("@tagaddod.com")) {
+      setLoginError("Only Tagaddod email addresses are allowed");
+      return;
+    }
+
     try {
-      await login();
+      await loginWithEmail(email);
     } catch (err) {
       setLoginError("Failed to login. Please try again.");
     }
@@ -70,7 +81,32 @@ const LoginPage: React.FC = () => {
           </div>
         )}
 
-        <div className="mt-6">
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Email Address
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.name@tagaddod.com"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
           <Button
             variant="primary"
             onClick={handleLogin}
@@ -102,15 +138,7 @@ const LoginPage: React.FC = () => {
                 Signing in...
               </>
             ) : (
-              <>
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M16 9v-4l8 7-8 7v-4h-8v-6h8zm-16-7v20h14v-2h-12v-16h12v-2h-14z"
-                  />
-                </svg>
-                Sign in to Application
-              </>
+              <>Sign in to Application</>
             )}
           </Button>
         </div>
