@@ -1,33 +1,47 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './common/components/Layout/Layout';
-import DashboardPage from './views/Dashboard';
-import AnalyticsPage from './views/Analytics';
-import RoutingPage from './views/Routing';
-import ContractsPage from './views/Contracts';
-import ContractForm from './views/Contracts/ContractForm';
-import ShipmentsPage from './views/Shipments';
-import NewShipmentForm from './views/Shipments/NewShipmentForm';
-import EditShipmentForm from './views/Shipments/EditShipmentForm';
-import SuppliersPage from './views/Suppliers';
-import SupplierForm from './views/Suppliers/SupplierForm';
-import TerminalsPage from './views/Terminals';
-import TerminalForm from './views/Terminals/TerminalForm';
-import StorageTanksPage from './views/StorageTanks';
-import StorageTankForm from './views/StorageTanks/StorageTankForm';
-import WarehousesPage from './views/Warehouses';
-import WarehouseForm from './views/Warehouses/WarehouseForm';
-import TanksPage from './views/Tanks';
-import TankForm from './views/Tanks/TankForm';
-import BuyersPage from './views/Buyers';
-import BuyerForm from './views/Buyers/BuyerForm';
-import { ErrorBoundary } from './common/components/ErrorBoundary/ErrorBoundary';
-import ToastContainer from './common/components/Toast/ToastContainer';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useRoutes,
+} from "react-router-dom";
+import Layout from "./common/components/Layout/Layout";
+import DashboardPage from "./views/Dashboard";
+import AnalyticsPage from "./views/Analytics";
+import RoutingPage from "./views/Routing";
+import ContractsPage from "./views/Contracts";
+import ContractForm from "./views/Contracts/ContractForm";
+import ShipmentsPage from "./views/Shipments";
+import NewShipmentForm from "./views/Shipments/NewShipmentForm";
+import EditShipmentForm from "./views/Shipments/EditShipmentForm";
+import SuppliersPage from "./views/Suppliers";
+import SupplierForm from "./views/Suppliers/SupplierForm";
+import TerminalsPage from "./views/Terminals";
+import TerminalForm from "./views/Terminals/TerminalForm";
+import StorageTanksPage from "./views/StorageTanks";
+import StorageTankForm from "./views/StorageTanks/StorageTankForm";
+import WarehousesPage from "./views/Warehouses";
+import WarehouseForm from "./views/Warehouses/WarehouseForm";
+import TanksPage from "./views/Tanks";
+import TankForm from "./views/Tanks/TankForm";
+import BuyersPage from "./views/Buyers";
+import BuyerForm from "./views/Buyers/BuyerForm";
+import { ErrorBoundary } from "./common/components/ErrorBoundary/ErrorBoundary";
+import ToastContainer from "./common/components/Toast/ToastContainer";
+import routes from "tempo-routes";
+
+// Create a component for Tempo routes to ensure useRoutes is used within Router context
+const TempoRoutes = () => {
+  return import.meta.env.VITE_TEMPO ? useRoutes(routes) : null;
+};
 
 const App = () => {
   return (
     <ErrorBoundary>
       <Router>
         <Layout>
+          {/* Tempo routes - only included in development when VITE_TEMPO is true */}
+          <TempoRoutes />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -56,7 +70,13 @@ const App = () => {
             <Route path="/terminals/edit/:id" element={<TerminalForm />} />
             <Route path="/storage-tanks" element={<StorageTanksPage />} />
             <Route path="/storage-tanks/new" element={<StorageTankForm />} />
-            <Route path="/storage-tanks/edit/:id" element={<StorageTankForm />} />
+            <Route
+              path="/storage-tanks/edit/:id"
+              element={<StorageTankForm />}
+            />
+
+            {/* Allow Tempo to capture routes before any catchall */}
+            {import.meta.env.VITE_TEMPO && <Route path="/tempobook/*" />}
           </Routes>
         </Layout>
         <ToastContainer />

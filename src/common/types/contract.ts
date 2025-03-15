@@ -1,7 +1,24 @@
-export type ContractType = 'Supply' | 'Sales';
-export type ContractStatus = 'opened' | 'pending' | 'closed';
+export type ContractType = "Supply" | "Sales";
+export type ContractStatus = "opened" | "pending" | "closed";
 
-export const CONTRACT_STATUSES: ContractStatus[] = ['opened', 'pending', 'closed'];
+export const CONTRACT_STATUSES: ContractStatus[] = [
+  "opened",
+  "pending",
+  "closed",
+];
+
+export type LoadingDuration = "week" | "month" | "quarter";
+
+export const LOADING_DURATIONS: LoadingDuration[] = [
+  "week",
+  "month",
+  "quarter",
+];
+
+export interface BrokerDetails {
+  name: string;
+  fees: string; // Using string to maintain consistency with other numeric fields
+}
 
 export interface Contract {
   id: string;
@@ -27,7 +44,11 @@ export interface Contract {
   deliveryCountry: string;
   deliveryPort: string;
   loadingStartDate: string;
+  loadingPeriod: string; // New field for loading period (days)
+  loadingDuration: LoadingDuration; // New field for loading duration
   deliveryDate: string;
+  externalReferenceId?: string; // External reference ID used by other party
+  broker?: BrokerDetails; // Optional broker details
   createdAt: string;
   updatedAt: string;
 }
