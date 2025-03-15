@@ -5,7 +5,7 @@ import { tempo } from "tempo-devtools/dist/vite";
 // Add conditional plugins for Tempo
 const conditionalPlugins = [];
 if (process.env.TEMPO === "true") {
-  conditionalPlugins.push(["tempo-devtools/dist/swc-plugin", {}]);
+  conditionalPlugins.push(["tempo-devtools/swc", {}]);
 }
 
 // https://vitejs.dev/config/

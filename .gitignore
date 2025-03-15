@@ -26,3 +26,7 @@ dist-ssr
 # Tempo files
 **/tempobook/dynamic/
 **/tempobook/storyboards/
+
+# Tempo files
+**/tempobook/dynamic/
+**/tempobook/storyboards/

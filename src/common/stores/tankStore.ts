@@ -1,4 +1,4 @@
-import { Tank, TankStatus, TankQuality } from "../types/tank";
+import { Tank, TankStatus } from "../types/tank";
 import { shipmentStore } from "./shipmentStore";
 import { contractsStore } from "./contractsStore";
 import {

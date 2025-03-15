@@ -30,11 +30,18 @@ import { ErrorBoundary } from "./common/components/ErrorBoundary/ErrorBoundary";
 import ToastContainer from "./common/components/Toast/ToastContainer";
 import routes from "tempo-routes";
 
+// Create a component for Tempo routes to ensure useRoutes is used within Router context
+const TempoRoutes = () => {
+  return import.meta.env.VITE_TEMPO ? useRoutes(routes) : null;
+};
+
 const App = () => {
   return (
     <ErrorBoundary>
       <Router>
         <Layout>
+          {/* Tempo routes - only included in development when VITE_TEMPO is true */}
+          <TempoRoutes />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -71,8 +78,6 @@ const App = () => {
             {/* Allow Tempo to capture routes before any catchall */}
             {import.meta.env.VITE_TEMPO && <Route path="/tempobook/*" />}
           </Routes>
-          {/* Tempo routes - only included in development when VITE_TEMPO is true */}
-          {import.meta.env.VITE_TEMPO && useRoutes(routes)}
         </Layout>
         <ToastContainer />
       </Router>
