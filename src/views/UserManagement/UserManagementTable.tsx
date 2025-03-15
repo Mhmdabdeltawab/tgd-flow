@@ -39,13 +39,17 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
 
   const filteredUsers = useMemo(() => {
     if (!debouncedSearchTerm) return users;
+    if (!Array.isArray(users)) {
+      console.warn("Users is not an array:", users);
+      return [];
+    }
 
     const lowerCaseSearch = debouncedSearchTerm.toLowerCase();
     return users.filter(
       (user) =>
-        user.name.toLowerCase().includes(lowerCaseSearch) ||
-        user.email.toLowerCase().includes(lowerCaseSearch) ||
-        user.role.toLowerCase().includes(lowerCaseSearch),
+        user.name?.toLowerCase().includes(lowerCaseSearch) ||
+        user.email?.toLowerCase().includes(lowerCaseSearch) ||
+        user.role?.toLowerCase().includes(lowerCaseSearch),
     );
   }, [users, debouncedSearchTerm]);
 
@@ -58,7 +62,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
     );
   }
 
-  if (users.length === 0) {
+  if (!Array.isArray(users) || users.length === 0) {
     return (
       <div className="p-8 text-center text-gray-500">
         No users found. Add a user to get started.
@@ -108,15 +112,17 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
                       <span className="text-indigo-600 font-medium">
-                        {user.name.charAt(0).toUpperCase()}
+                        {user.name?.charAt(0).toUpperCase() || "U"}
                       </span>
                     </div>
                   )}
                   <div>
                     <div className="text-sm font-medium text-gray-900">
-                      {user.name}
+                      {user.name || "Unknown"}
                     </div>
-                    <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="text-sm text-gray-500">
+                      {user.email || "No email"}
+                    </div>
                   </div>
                 </div>
               </td>
@@ -140,7 +146,9 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                             <input
                               type="checkbox"
                               id={`${user.id}-${section.key}-view`}
-                              checked={editedPermissions[section.key].view}
+                              checked={
+                                editedPermissions[section.key]?.view || false
+                              }
                               onChange={(e) =>
                                 updatePermission(
                                   section.key,
@@ -161,7 +169,9 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                             <input
                               type="checkbox"
                               id={`${user.id}-${section.key}-edit`}
-                              checked={editedPermissions[section.key].edit}
+                              checked={
+                                editedPermissions[section.key]?.edit || false
+                              }
                               onChange={(e) =>
                                 updatePermission(
                                   section.key,
@@ -182,7 +192,9 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                             <input
                               type="checkbox"
                               id={`${user.id}-${section.key}-delete`}
-                              checked={editedPermissions[section.key].delete}
+                              checked={
+                                editedPermissions[section.key]?.delete || false
+                              }
                               onChange={(e) =>
                                 updatePermission(
                                   section.key,
@@ -205,33 +217,34 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">
-                    {Object.entries(user.permissions)
-                      .filter(
-                        ([_, permission]) =>
-                          permission.view ||
-                          permission.edit ||
-                          permission.delete,
-                      )
-                      .map(([key, permission]) => {
-                        const section = permissionSections.find(
-                          (s) => s.key === key,
-                        );
-                        if (!section) return null;
+                    {user.permissions &&
+                      Object.entries(user.permissions)
+                        .filter(
+                          ([_, permission]) =>
+                            permission?.view ||
+                            permission?.edit ||
+                            permission?.delete,
+                        )
+                        .map(([key, permission]) => {
+                          const section = permissionSections.find(
+                            (s) => s.key === key,
+                          );
+                          if (!section) return null;
 
-                        const permissions = [];
-                        if (permission.view) permissions.push("View");
-                        if (permission.edit) permissions.push("Edit");
-                        if (permission.delete) permissions.push("Delete");
+                          const permissions = [];
+                          if (permission?.view) permissions.push("View");
+                          if (permission?.edit) permissions.push("Edit");
+                          if (permission?.delete) permissions.push("Delete");
 
-                        return (
-                          <div key={key} className="mb-1">
-                            <span className="font-medium">
-                              {section.label}:
-                            </span>{" "}
-                            {permissions.join(", ")}
-                          </div>
-                        );
-                      })}
+                          return (
+                            <div key={key} className="mb-1">
+                              <span className="font-medium">
+                                {section.label}:
+                              </span>{" "}
+                              {permissions.join(", ")}
+                            </div>
+                          );
+                        })}
                   </div>
                 )}
               </td>
@@ -258,7 +271,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                 ) : (
                   <Button
                     variant="secondary"
-                    onClick={() => onEditUser(user.id, user.permissions)}
+                    onClick={() => onEditUser(user.id, user.permissions || {})}
                     className="inline-flex items-center px-2.5 py-1.5 text-xs"
                     disabled={
                       currentUser?.id === user.id &&

@@ -45,6 +45,8 @@ export const handleSupabaseResponse = <T>(
 // Utility function to ensure tables exist with basic data
 export const ensureTablesExist = async () => {
   try {
+    console.log("Checking database tables and permissions...");
+
     // Check if tables have data
     const hasUsers = await checkTableData("users");
     const hasParties = await checkTableData("parties");
@@ -52,43 +54,41 @@ export const ensureTablesExist = async () => {
     const hasShipments = await checkTableData("shipments");
     const hasTanks = await checkTableData("tanks");
 
-    if (
-      !hasUsers ||
-      !hasParties ||
-      !hasContracts ||
-      !hasShipments ||
-      !hasTanks
-    ) {
-      console.log("Some tables are missing data, running setup script...");
+    console.log("Table data check:", {
+      hasUsers,
+      hasParties,
+      hasContracts,
+      hasShipments,
+      hasTanks,
+    });
 
-      // Run the SQL script to ensure tables and data exist
-      const { error } = await supabase.rpc("pgrest", {
-        query: `
-          -- Make sure RLS is disabled for easier development
-          ALTER TABLE IF EXISTS public.user_permissions DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.users DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.parties DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.contracts DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.shipments DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.tanks DISABLE ROW LEVEL SECURITY;
-          ALTER TABLE IF EXISTS public.documents DISABLE ROW LEVEL SECURITY;
+    // Run SQL to fix permissions and ensure tables exist
+    const { error } = await supabase.rpc("pgrest", {
+      query: `
+        -- Make sure RLS is disabled for easier development
+        ALTER TABLE IF EXISTS public.user_permissions DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.users DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.parties DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.contracts DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.shipments DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.tanks DISABLE ROW LEVEL SECURITY;
+        ALTER TABLE IF EXISTS public.documents DISABLE ROW LEVEL SECURITY;
 
-          -- Add realtime support for all tables
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.user_permissions;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.parties;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.contracts;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.tanks;
-          ALTER PUBLICATION supabase_realtime ADD TABLE public.documents;
-        `,
-      });
+        -- Add realtime support for all tables
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.user_permissions;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.parties;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.contracts;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.tanks;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.documents;
+      `,
+    });
 
-      if (error) {
-        console.error("Error ensuring tables exist:", error);
-      } else {
-        console.log("Tables setup completed successfully");
-      }
+    if (error) {
+      console.error("Error ensuring tables exist:", error);
+    } else {
+      console.log("Database setup completed successfully");
     }
   } catch (error) {
     console.error("Error in ensureTablesExist:", error);
@@ -96,4 +96,5 @@ export const ensureTablesExist = async () => {
 };
 
 // Call this function when the app initializes
-ensureTablesExist();
+// We're no longer disabling RLS as we've set up proper policies
+// ensureTablesExist();

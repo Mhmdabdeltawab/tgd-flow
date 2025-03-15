@@ -1,4 +1,4 @@
-import { useToastStore } from '../stores/toastStore';
+import { useToastStore } from "../stores/toastStore";
 
 interface ErrorResponse {
   message: string;
@@ -8,7 +8,7 @@ interface ErrorResponse {
 
 class ErrorService {
   private static instance: ErrorService;
-  
+
   private constructor() {
     this.setupGlobalHandlers();
   }
@@ -22,7 +22,7 @@ class ErrorService {
 
   private setupGlobalHandlers() {
     // Handle unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
+    window.addEventListener("unhandledrejection", (event) => {
       if (event.reason instanceof Error) {
         event.preventDefault();
         this.handleError(event.reason);
@@ -30,7 +30,7 @@ class ErrorService {
     });
 
     // Handle uncaught errors
-    window.addEventListener('error', (event) => {
+    window.addEventListener("error", (event) => {
       if (event.error instanceof Error) {
         event.preventDefault();
         this.handleError(event.error);
@@ -40,19 +40,19 @@ class ErrorService {
 
   public handleError(error: any) {
     const { addToast } = useToastStore.getState();
-    
+
     // Log error details for debugging
-    console.group('Error Details');
-    console.error('Error:', error);
-    console.error('Stack:', error?.stack);
+    console.group("Error Details");
+    console.error("Error:", error);
+    console.error("Stack:", error?.stack);
     console.groupEnd();
 
     // Format the error message
     const errorMessage = this.formatErrorMessage(error);
-    
+
     // Show toast notification
     addToast({
-      type: 'error',
+      type: "error",
       message: errorMessage,
     });
 
@@ -80,23 +80,27 @@ class ErrorService {
 
     // If it's a regular Error object
     if (error instanceof Error) {
-      return error.message || 'An unexpected error occurred';
+      return error.message || "An unexpected error occurred";
     }
 
     // If it's a string
-    if (typeof error === 'string') {
+    if (typeof error === "string") {
       return error;
     }
 
     // Default error message
-    return 'An unexpected error occurred';
+    return "An unexpected error occurred";
   }
 
   private isErrorResponse(error: any): error is ErrorResponse {
-    return error && typeof error.message === 'string';
+    return error && typeof error.message === "string";
   }
 
-  public createError(message: string, code?: string, details?: Record<string, any>): ErrorResponse {
+  public createError(
+    message: string,
+    code?: string,
+    details?: Record<string, any>,
+  ): ErrorResponse {
     return { message, code, details };
   }
 }
@@ -107,7 +111,10 @@ export const errorService = ErrorService.getInstance();
 export function useError() {
   return {
     handleError: (error: any) => errorService.handleError(error),
-    createError: (message: string, code?: string, details?: Record<string, any>) =>
-      errorService.createError(message, code, details),
+    createError: (
+      message: string,
+      code?: string,
+      details?: Record<string, any>,
+    ) => errorService.createError(message, code, details),
   };
 }

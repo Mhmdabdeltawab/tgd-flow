@@ -6,6 +6,7 @@ import TableToolbar from "../../common/components/Table/TableToolbar";
 import UserManagementTable from "./UserManagementTable";
 import UserAddForm from "./UserAddForm";
 import useUserManagement from "../../common/hooks/useUserManagement";
+import RlsStatusPanel from "./RlsStatusPanel";
 
 const UserManagement: React.FC = () => {
   const {
@@ -62,6 +63,10 @@ const UserManagement: React.FC = () => {
       />
 
       <div className="p-6 mt-6">
+        <div className="mb-6">
+          <RlsStatusPanel />
+        </div>
+
         <TableToolbar
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}

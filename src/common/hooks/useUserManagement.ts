@@ -24,8 +24,10 @@ const useUserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
+      console.log("Fetching users...");
       // Direct fetch without setTimeout to avoid async issues
       const allUsers = await getAllUsers();
+      console.log("Users fetched:", allUsers);
       if (Array.isArray(allUsers)) {
         setUsers(allUsers);
       } else {
@@ -39,6 +41,8 @@ const useUserManagement = () => {
         title: "Error",
         message: "Failed to load users. Please try again.",
       });
+      // Set empty array to prevent infinite loading
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -46,7 +50,17 @@ const useUserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+
+    // Add a retry mechanism if initial fetch fails
+    const retryTimeout = setTimeout(() => {
+      if (users.length === 0 && loading) {
+        console.log("Retrying user fetch...");
+        fetchUsers();
+      }
+    }, 3000);
+
+    return () => clearTimeout(retryTimeout);
+  }, [fetchUsers, users.length, loading]);
 
   const handleAddUser = async () => {
     if (!newUserEmail.trim()) {
@@ -89,6 +103,7 @@ const useUserManagement = () => {
 
   const startEditingUser = (userId: string, permissions: UserPermissions) => {
     setEditingUser(userId);
+    // Create a deep copy to avoid reference issues
     setEditedPermissions(JSON.parse(JSON.stringify(permissions)));
   };
 
