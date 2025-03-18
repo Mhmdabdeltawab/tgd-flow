@@ -485,11 +485,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      pgrest: {
+      get_rls_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          table_name: string
+          has_rls: boolean
+          policies: string[]
+        }[]
+      }
+      insert_user_permissions: {
         Args: {
-          query: string
+          permissions_data: Json
         }
-        Returns: Json
+        Returns: undefined
+      }
+      update_user_permissions: {
+        Args: {
+          user_id: string
+          permissions_data: Json
+        }
+        Returns: undefined
       }
     }
     Enums: {

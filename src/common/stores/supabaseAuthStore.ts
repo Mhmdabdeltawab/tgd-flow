@@ -250,17 +250,24 @@ const useSupabaseAuthStore = create<AuthState>(
         }
 
         try {
+          console.log("Starting user creation process for:", email);
+
           // Check if user already exists
           const { data: existingUsers, error: checkError } = await supabase
             .from("users")
             .select("id")
             .eq("email", email);
 
-          if (checkError) throw checkError;
+          if (checkError) {
+            console.error("Error checking existing user:", checkError);
+            throw checkError;
+          }
 
           if (existingUsers && existingUsers.length > 0) {
             throw new Error("User already exists");
           }
+
+          console.log("Creating new user with role:", role);
 
           // Create new user
           const { data: userData, error: userError } = await supabase
@@ -273,7 +280,12 @@ const useSupabaseAuthStore = create<AuthState>(
             .select()
             .single();
 
-          if (userError) throw userError;
+          if (userError) {
+            console.error("Error creating user:", userError);
+            throw userError;
+          }
+
+          console.log("User created successfully:", userData);
 
           // Set permissions based on role or use custom permissions if provided
           const permissions =
@@ -297,13 +309,51 @@ const useSupabaseAuthStore = create<AuthState>(
             user_management: permissions.userManagement,
           };
 
-          const { error: permissionsError } = await supabase
-            .from("user_permissions")
-            .insert(supabasePermissions);
+          console.log("Inserting permissions for user:", userData.id);
 
-          if (permissionsError) throw permissionsError;
+          // Use RPC function to bypass RLS
+          const { error: permissionsError } = await supabase.rpc(
+            "insert_user_permissions",
+            { permissions_data: supabasePermissions },
+          );
+
+          // Fallback to direct insert if RPC fails
+          if (permissionsError) {
+            console.warn("RPC failed, trying direct insert:", permissionsError);
+
+            // Try direct insert with service role
+            const { error: directInsertError } = await supabase
+              .from("user_permissions")
+              .insert(supabasePermissions);
+
+            if (directInsertError) {
+              console.error(
+                "Error setting user permissions:",
+                directInsertError,
+              );
+
+              // If permissions insertion fails, delete the user to maintain consistency
+              const { error: deleteError } = await supabase
+                .from("users")
+                .delete()
+                .eq("id", userData.id);
+
+              if (deleteError) {
+                console.error(
+                  "Error cleaning up user after permissions failure:",
+                  deleteError,
+                );
+              }
+
+              throw new Error(
+                `Failed to set user permissions: ${directInsertError.message}`,
+              );
+            }
+          }
+
+          console.log("User and permissions created successfully");
         } catch (error: any) {
-          console.error("Error adding user:", error);
+          console.error("Error in addUser function:", error);
           throw error;
         }
       },
@@ -395,24 +445,59 @@ const useSupabaseAuthStore = create<AuthState>(
 
           if (checkError) throw checkError;
 
+          // Try using RPC function first to bypass RLS
           if (existingPermissions && existingPermissions.length > 0) {
-            // Update existing permissions
-            const { error: updateError } = await supabase
-              .from("user_permissions")
-              .update(supabasePermissions)
-              .eq("user_id", userId);
-
-            if (updateError) throw updateError;
-          } else {
-            // Create new permissions record
-            const { error: insertError } = await supabase
-              .from("user_permissions")
-              .insert({
+            // Update existing permissions using RPC
+            const { error: rpcError } = await supabase.rpc(
+              "update_user_permissions",
+              {
                 user_id: userId,
-                ...supabasePermissions,
-              });
+                permissions_data: supabasePermissions,
+              },
+            );
 
-            if (insertError) throw insertError;
+            if (rpcError) {
+              console.warn(
+                "RPC update failed, trying direct update:",
+                rpcError,
+              );
+
+              // Fallback to direct update
+              const { error: updateError } = await supabase
+                .from("user_permissions")
+                .update(supabasePermissions)
+                .eq("user_id", userId);
+
+              if (updateError) throw updateError;
+            }
+          } else {
+            // Create new permissions record using RPC
+            const { error: rpcError } = await supabase.rpc(
+              "insert_user_permissions",
+              {
+                permissions_data: {
+                  user_id: userId,
+                  ...supabasePermissions,
+                },
+              },
+            );
+
+            if (rpcError) {
+              console.warn(
+                "RPC insert failed, trying direct insert:",
+                rpcError,
+              );
+
+              // Fallback to direct insert
+              const { error: insertError } = await supabase
+                .from("user_permissions")
+                .insert({
+                  user_id: userId,
+                  ...supabasePermissions,
+                });
+
+              if (insertError) throw insertError;
+            }
           }
 
           // Update current user if it's the same user

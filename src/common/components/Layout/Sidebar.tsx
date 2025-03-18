@@ -72,8 +72,19 @@ export default function Sidebar() {
   const { canView, isAdmin } = usePermissions();
   const isActive = (path: string) => location.pathname === path;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      // Import supabase client directly to ensure we sign out properly
+      const { supabase } = await import("../../services/supabaseClient");
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      // Then call the store's logout function
+      await logout();
+      // Explicitly redirect to login page
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   return (
@@ -83,9 +94,8 @@ export default function Sidebar() {
           <Box className="w-6 h-6 text-indigo-600 mr-2" />
           <span className="text-lg font-semibold text-gray-900">Tagaddod</span>
         </div>
-        <div className="text-xs text-gray-500 mt-1">FLOW</div>
+        <div className="text-xs text-gray-500 mt-[1]">FLOW</div>
       </div>
-
       <div className="flex-1 overflow-y-auto">
         <nav className="mt-2 space-y-1 px-2">
           {canView("dashboard") && (
@@ -204,7 +214,6 @@ export default function Sidebar() {
           )}
         </NavSection>
       </div>
-
       <div className="p-4 border-t border-gray-200 space-y-2">
         {user && (
           <div className="flex items-center mb-3">

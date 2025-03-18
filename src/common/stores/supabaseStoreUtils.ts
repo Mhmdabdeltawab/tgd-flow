@@ -27,6 +27,19 @@ export const logSupabaseError = (operation: string, error: any) => {
     hint: error.hint,
     code: error.code,
   });
+
+  // Add more detailed logging for specific error codes
+  if (error.code === "PGRST116") {
+    console.warn(`No rows found when ${operation}`);
+  } else if (error.code === "PGRST104") {
+    console.error(`Schema validation failed when ${operation}`);
+  } else if (error.code === "42P01") {
+    console.error(
+      `Table does not exist when ${operation}. Check your migrations.`,
+    );
+  } else if (error.code === "42501") {
+    console.error(`Permission denied when ${operation}. Check RLS policies.`);
+  }
 };
 
 // Utility function to handle Supabase responses

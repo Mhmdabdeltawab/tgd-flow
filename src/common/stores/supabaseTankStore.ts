@@ -26,7 +26,10 @@ const useSupabaseTankStore = create<TankState>(() => ({
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching all tanks:", error);
+        throw error;
+      }
 
       return data.map(mapTankFromSupabase);
     } catch (error) {
@@ -45,6 +48,7 @@ const useSupabaseTankStore = create<TankState>(() => ({
 
       if (error) {
         if (error.code === "PGRST116") return undefined; // No rows returned
+        console.error(`Error fetching tank ${id}:", error);
         throw error;
       }
 
@@ -63,7 +67,10 @@ const useSupabaseTankStore = create<TankState>(() => ({
         .eq("shipment_id", shipmentId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error fetching tanks for shipment ${shipmentId}:`, error);
+        throw error;
+      }
 
       return data.map(mapTankFromSupabase);
     } catch (error) {
@@ -153,7 +160,10 @@ const useSupabaseTankStore = create<TankState>(() => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating tank:", error);
+        throw error;
+      }
 
       // Update shipment quality
       await updateShipmentQualityAfterTankChange(data.shipmentId);
@@ -249,7 +259,10 @@ const useSupabaseTankStore = create<TankState>(() => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error updating tank ${id}:`, error);
+        throw error;
+      }
 
       // Update shipment quality if quality changed
       if (data.quality) {
@@ -279,7 +292,10 @@ const useSupabaseTankStore = create<TankState>(() => ({
 
       const { error } = await supabase.from("tanks").delete().eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error deleting tank ${id}:`, error);
+        throw error;
+      }
 
       // Update shipment quality after tank deletion
       await updateShipmentQualityAfterTankChange(shipmentId);

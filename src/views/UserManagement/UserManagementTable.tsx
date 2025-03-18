@@ -1,8 +1,11 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { User, UserPermissions } from "../../common/types/auth";
-import { Edit, Save, X } from "lucide-react";
+import { Edit, Save, X, RefreshCw, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Button from "../../common/components/Button/Button";
 import { useDebounce } from "../../common/hooks/useDebounce";
+import DeleteButton from "../../common/components/DeleteButton/DeleteButton";
+import useSupabaseAuthStore from "../../common/stores/supabaseAuthStore";
 
 interface UserManagementTableProps {
   users: User[];
@@ -12,6 +15,7 @@ interface UserManagementTableProps {
   onEditUser: (userId: string, permissions: UserPermissions) => void;
   onSavePermissions: (userId: string) => Promise<void>;
   onCancelEdit: () => void;
+  onDeleteUser?: (userId: string) => Promise<void>;
   editingUser: string | null;
   editedPermissions: UserPermissions | null;
   updatePermission: (
@@ -20,6 +24,7 @@ interface UserManagementTableProps {
     value: boolean,
   ) => void;
   permissionSections: Array<{ key: keyof UserPermissions; label: string }>;
+  deletingUserId?: string | null;
 }
 
 const UserManagementTable: React.FC<UserManagementTableProps> = ({
@@ -30,12 +35,16 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
   onEditUser,
   onSavePermissions,
   onCancelEdit,
+  onDeleteUser,
   editingUser,
   editedPermissions,
   updatePermission,
   permissionSections,
+  deletingUserId,
 }) => {
+  const navigate = useNavigate();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   const filteredUsers = useMemo(() => {
     if (!debouncedSearchTerm) return users;
@@ -53,6 +62,23 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
     );
   }, [users, debouncedSearchTerm]);
 
+  const handleSavePermissions = async (userId: string) => {
+    setSavingUserId(userId);
+    try {
+      await onSavePermissions(userId);
+    } catch (error) {
+      console.error("Error saving permissions:", error);
+      // Error will be shown by the toast in the parent component
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!onDeleteUser) return;
+    await onDeleteUser(userId);
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center">
@@ -62,7 +88,23 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
     );
   }
 
-  if (!Array.isArray(users) || users.length === 0) {
+  if (!Array.isArray(users)) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        <p>Error loading users. Data format is incorrect.</p>
+        <Button
+          variant="secondary"
+          onClick={() => window.location.reload()}
+          className="mt-4 inline-flex items-center"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh Page
+        </Button>
+      </div>
+    );
+  }
+
+  if (users.length === 0) {
     return (
       <div className="p-8 text-center text-gray-500">
         No users found. Add a user to get started.
@@ -253,34 +295,74 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                   <div className="flex justify-end space-x-2">
                     <Button
                       variant="primary"
-                      onClick={() => onSavePermissions(user.id)}
+                      onClick={() => handleSavePermissions(user.id)}
                       className="inline-flex items-center px-2.5 py-1.5 text-xs"
+                      disabled={savingUserId === user.id}
                     >
-                      <Save className="w-3 h-3 mr-1" />
-                      Save
+                      {savingUserId === user.id ? (
+                        <>
+                          <div className="w-3 h-3 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3 h-3 mr-1" />
+                          Save
+                        </>
+                      )}
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={onCancelEdit}
                       className="inline-flex items-center px-2.5 py-1.5 text-xs"
+                      disabled={savingUserId === user.id}
                     >
                       <X className="w-3 h-3 mr-1" />
                       Cancel
                     </Button>
                   </div>
                 ) : (
-                  <Button
-                    variant="secondary"
-                    onClick={() => onEditUser(user.id, user.permissions || {})}
-                    className="inline-flex items-center px-2.5 py-1.5 text-xs"
-                    disabled={
-                      currentUser?.id === user.id &&
-                      currentUser?.role === "admin"
-                    }
-                  >
-                    <Edit className="w-3 h-3 mr-1" />
-                    Edit
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        onEditUser(user.id, user.permissions || {})
+                      }
+                      className="inline-flex items-center px-2.5 py-1.5 text-xs"
+                      disabled={
+                        (currentUser?.id === user.id &&
+                          currentUser?.role === "admin") ||
+                        savingUserId === user.id ||
+                        deletingUserId === user.id
+                      }
+                    >
+                      {savingUserId === user.id ? (
+                        <>
+                          <div className="w-3 h-3 mr-1 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Edit className="w-3 h-3 mr-1" />
+                          Quick Edit
+                        </>
+                      )}
+                    </Button>
+                    {onDeleteUser && (
+                      <DeleteButton
+                        id={user.id}
+                        resourceType="User"
+                        onDelete={handleDeleteUser}
+                        disabled={
+                          currentUser?.id === user.id ||
+                          savingUserId === user.id ||
+                          deletingUserId === user.id
+                        }
+                        size="sm"
+                        checkPermission={false}
+                      />
+                    )}
+                  </div>
                 )}
               </td>
             </tr>

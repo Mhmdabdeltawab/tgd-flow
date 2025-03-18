@@ -30,3 +30,33 @@ supabase.auth.onAuthStateChange((event, session) => {
     session ? "User authenticated" : "No session",
   );
 });
+
+// Test connection on initialization
+supabase
+  .from("parties")
+  .select("count", { count: "exact", head: true })
+  .then(({ count, error }) => {
+    if (error) {
+      console.error("Supabase connection test failed:", error);
+    } else {
+      console.log("Supabase connection successful. Parties count:", count);
+
+      // Log all parties for debugging
+      supabase
+        .from("parties")
+        .select("*")
+        .then(({ data, error: partiesError }) => {
+          if (partiesError) {
+            console.error("Error fetching all parties:", partiesError);
+          } else {
+            console.log("All parties in database:", data);
+
+            // Force refresh of any components that might be using this data
+            window.dispatchEvent(new Event("supabase-data-updated"));
+          }
+        });
+    }
+  })
+  .catch((err) => {
+    console.error("Supabase connection test error:", err);
+  });

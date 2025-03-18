@@ -6,7 +6,10 @@ import { logSupabaseError } from "./supabaseStoreUtils";
 
 interface PartyState {
   getAll: (type: "suppliers" | "buyers") => Promise<Party[]>;
-  getById: (id: string) => Promise<Party | undefined>;
+  getById: (
+    type: "suppliers" | "buyers",
+    id: string,
+  ) => Promise<Party | undefined>;
   create: (
     data: Omit<Party, "id" | "createdAt" | "updatedAt">,
   ) => Promise<Party>;
@@ -17,6 +20,8 @@ interface PartyState {
 const useSupabasePartyStore = create<PartyState>(() => ({
   getAll: async (type) => {
     try {
+      console.log(`supabasePartyStore: Fetching ${type} from Supabase...`);
+
       // First check if the table exists and has data
       const { count, error: countError } = await supabase
         .from("parties")
@@ -24,15 +29,22 @@ const useSupabasePartyStore = create<PartyState>(() => ({
 
       if (countError) {
         logSupabaseError(`checking parties table`, countError);
+        console.error(
+          `supabasePartyStore: Error checking parties table:`,
+          countError,
+        );
         return [];
       }
 
       // If no data, return empty array
       if (count === 0) {
-        console.log(`No ${type} found in database`);
+        console.log(`supabasePartyStore: No parties found in database`);
         return [];
       }
 
+      console.log(
+        `supabasePartyStore: Found ${count} parties, fetching ${type}...`,
+      );
       const { data, error } = await supabase
         .from("parties")
         .select("*")
@@ -41,33 +53,50 @@ const useSupabasePartyStore = create<PartyState>(() => ({
 
       if (error) {
         logSupabaseError(`fetching ${type}`, error);
+        console.error(`supabasePartyStore: Error fetching ${type}:`, error);
         return [];
       }
 
-      return data.map(mapPartyFromSupabase);
+      if (!data || data.length === 0) {
+        console.log(`supabasePartyStore: No ${type} found in database`);
+        return [];
+      }
+
+      console.log(
+        `supabasePartyStore: Fetched ${data.length} ${type} data:`,
+        data,
+      );
+
+      const mappedData = data.map(mapPartyFromSupabase);
+      console.log(
+        `supabasePartyStore: Mapped ${mappedData.length} ${type} data:`,
+        mappedData,
+      );
+      return mappedData;
     } catch (error) {
-      console.error(`Error fetching ${type}:`, error);
+      console.error(`supabasePartyStore: Error fetching ${type}:`, error);
       return [];
     }
   },
 
-  getById: async (id) => {
+  getById: async (type, id) => {
     try {
       const { data, error } = await supabase
         .from("parties")
         .select("*")
         .eq("id", id)
+        .eq("type", type)
         .single();
 
       if (error) {
         if (error.code === "PGRST116") return undefined; // No rows returned
-        logSupabaseError(`fetching party ${id}`, error);
+        logSupabaseError(`fetching ${type} party ${id}`, error);
         return undefined;
       }
 
       return mapPartyFromSupabase(data);
     } catch (error) {
-      console.error(`Error fetching party ${id}:`, error);
+      console.error(`Error fetching ${type} party ${id}:`, error);
       return undefined;
     }
   },
@@ -185,3 +214,5 @@ function mapPartyFromSupabase(data: any): Party {
     updatedAt: new Date(data.updated_at),
   };
 }
+
+export default useSupabasePartyStore;

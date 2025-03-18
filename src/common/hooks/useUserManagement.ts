@@ -20,14 +20,19 @@ const useUserManagement = () => {
     useState<UserPermissions | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { showToast } = useToast();
+  const [fetchAttempted, setFetchAttempted] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    if (fetchAttempted) return;
+
     setLoading(true);
+    setFetchAttempted(true);
+
     try {
       console.log("Fetching users...");
-      // Direct fetch without setTimeout to avoid async issues
       const allUsers = await getAllUsers();
       console.log("Users fetched:", allUsers);
+
       if (Array.isArray(allUsers)) {
         setUsers(allUsers);
       } else {
@@ -41,26 +46,15 @@ const useUserManagement = () => {
         title: "Error",
         message: "Failed to load users. Please try again.",
       });
-      // Set empty array to prevent infinite loading
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [getAllUsers, showToast]);
+  }, [getAllUsers, showToast, fetchAttempted]);
 
   useEffect(() => {
     fetchUsers();
-
-    // Add a retry mechanism if initial fetch fails
-    const retryTimeout = setTimeout(() => {
-      if (users.length === 0 && loading) {
-        console.log("Retrying user fetch...");
-        fetchUsers();
-      }
-    }, 3000);
-
-    return () => clearTimeout(retryTimeout);
-  }, [fetchUsers, users.length, loading]);
+  }, [fetchUsers]);
 
   const handleAddUser = async () => {
     if (!newUserEmail.trim()) {
@@ -82,6 +76,12 @@ const useUserManagement = () => {
     }
 
     try {
+      console.log(
+        "Adding user with email:",
+        newUserEmail,
+        "and role:",
+        newUserRole,
+      );
       await addUser(newUserEmail, newUserRole);
       showToast({
         type: "success",
@@ -91,12 +91,17 @@ const useUserManagement = () => {
       setNewUserEmail("");
       setNewUserRole("user");
       setIsAddingUser(false);
+
+      // Reset fetch attempted flag to allow a new fetch
+      setFetchAttempted(false);
       fetchUsers();
     } catch (error: any) {
+      console.error("Error adding user:", error);
       showToast({
         type: "error",
         title: "Error",
-        message: error.message || "Failed to add user",
+        message:
+          error.message || "Failed to add user. Check console for details.",
       });
     }
   };
@@ -124,6 +129,9 @@ const useUserManagement = () => {
       });
       setEditingUser(null);
       setEditedPermissions(null);
+
+      // Reset fetch attempted flag to allow a new fetch
+      setFetchAttempted(false);
       fetchUsers();
     } catch (error) {
       showToast({
@@ -150,6 +158,11 @@ const useUserManagement = () => {
     });
   };
 
+  const refreshUsers = () => {
+    setFetchAttempted(false);
+    fetchUsers();
+  };
+
   return {
     users,
     loading,
@@ -169,7 +182,8 @@ const useUserManagement = () => {
     cancelEditingUser,
     saveUserPermissions,
     updatePermission,
-    fetchUsers,
+    fetchUsers: refreshUsers,
+    // Don't expose deleteUser directly from here as it causes issues with hook vs store access patterns
   };
 };
 

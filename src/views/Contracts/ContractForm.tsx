@@ -5,7 +5,7 @@ import FormPage from "../../common/components/Form/FormPage";
 import FormSection from "../../common/components/Form/FormSection";
 import FormField from "../../common/components/Form/FormField";
 import { useForm } from "../../common/hooks/useForm";
-import { contractsStore } from "../../common/stores/contractsStore";
+import useSupabaseContractsStore from "../../common/stores/supabaseContractsStore";
 import { Contract } from "../../common/types/contract";
 import { countries } from "../../common/data/countries";
 import { currencies } from "../../common/data/currencies";
@@ -64,6 +64,7 @@ import StatusBadge from "../../common/components/StatusBadge/StatusBadge";
 export default function ContractForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const contractsStore = useSupabaseContractsStore();
   const {
     documents,
     selectedDocument,
@@ -79,24 +80,33 @@ export default function ContractForm() {
   // Load data if editing
   React.useEffect(() => {
     if (id) {
-      const contract = contractsStore.getById(id);
-      if (contract) {
-        const {
-          id: _,
-          createdAt: __,
-          updatedAt: ___,
-          status: ____,
-          ...formData
-        } = contract;
-        setInitialFormState(formData);
-        if (formData.deliveryCountry) {
-          setAvailablePorts(getPortsByCountry(formData.deliveryCountry));
+      const fetchContract = async () => {
+        try {
+          const contract = await contractsStore.getById(id);
+          if (contract) {
+            const {
+              id: _,
+              createdAt: __,
+              updatedAt: ___,
+              status: ____,
+              ...formData
+            } = contract;
+            setInitialFormState(formData);
+            if (formData.deliveryCountry) {
+              setAvailablePorts(getPortsByCountry(formData.deliveryCountry));
+            }
+          } else {
+            navigate("/contracts");
+          }
+        } catch (error) {
+          console.error("Error fetching contract:", error);
+          navigate("/contracts");
         }
-      } else {
-        navigate("/contracts");
-      }
+      };
+
+      fetchContract();
     }
-  }, [id, navigate]);
+  }, [id, navigate, contractsStore]);
 
   // Update available ports when country changes
   const handleCountryChange = useCallback((country: string) => {
@@ -106,16 +116,6 @@ export default function ContractForm() {
   // Custom validation function
   const validate = useCallback((data: ContractFormData) => {
     const errors: Partial<Record<keyof ContractFormData, string>> = {};
-
-    // Check if product type is selected
-    if (!data.productType) {
-      errors.productType = "Product type is required";
-    }
-
-    // Check if incoterm is selected
-    if (!data.incoterm) {
-      errors.incoterm = "Incoterm is required";
-    }
 
     // Required fields validation
     const requiredFields: (keyof ContractFormData)[] = [
@@ -143,43 +143,41 @@ export default function ContractForm() {
       "deliveryDate",
     ];
 
+    // Check all required fields
+    let hasRequiredFieldErrors = false;
     requiredFields.forEach((field) => {
       if (!data[field]) {
         errors[field] = "This field is required";
+        hasRequiredFieldErrors = true;
       }
     });
 
+    // If any required fields are missing, return early with errors
+    if (hasRequiredFieldErrors) {
+      errors.submit = "Please fill in all required fields before submitting";
+      return errors;
+    }
+
     // Validate quantity is a positive number
-    if (
-      data.quantity &&
-      (isNaN(Number(data.quantity)) || Number(data.quantity) <= 0)
-    ) {
+    if (isNaN(Number(data.quantity)) || Number(data.quantity) <= 0) {
       errors.quantity = "Quantity must be a positive number";
     }
 
     // Validate unit price is a positive number
-    if (
-      data.unitPrice &&
-      (isNaN(Number(data.unitPrice)) || Number(data.unitPrice) <= 0)
-    ) {
+    if (isNaN(Number(data.unitPrice)) || Number(data.unitPrice) <= 0) {
       errors.unitPrice = "Unit price must be a positive number";
     }
 
     // Validate allowed variance is between 0 and 100
     const variance = Number(data.allowedVariance);
-    if (
-      data.allowedVariance &&
-      (isNaN(variance) || variance < 0 || variance > 100)
-    ) {
+    if (isNaN(variance) || variance < 0 || variance > 100) {
       errors.allowedVariance = "Allowed variance must be between 0 and 100";
     }
 
     // Validate loading period
-    if (data.loadingPeriod) {
-      const period = Number(data.loadingPeriod);
-      if (isNaN(period) || period <= 0 || !Number.isInteger(period)) {
-        errors.loadingPeriod = "Loading period must be a positive integer";
-      }
+    const period = Number(data.loadingPeriod);
+    if (isNaN(period) || period <= 0 || !Number.isInteger(period)) {
+      errors.loadingPeriod = "Loading period must be a positive integer";
     }
 
     // Validate dates
@@ -197,15 +195,82 @@ export default function ContractForm() {
   // Form submission handler
   const handleSubmit = useCallback(
     async (data: ContractFormData) => {
-      if (id) {
-        await contractsStore.update(id, data);
-        navigate("/contracts");
-      } else {
-        await contractsStore.create(data);
-        navigate("/contracts");
+      try {
+        // Validate UUID format for buyer and seller IDs
+        const isValidUuid = (id: string) =>
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            id,
+          );
+
+        if (data.buyerId && !isValidUuid(data.buyerId)) {
+          throw new Error(
+            `Invalid UUID format for Buyer ID: ${data.buyerId}. Please select a valid buyer.`,
+          );
+        }
+
+        if (data.sellerId && !isValidUuid(data.sellerId)) {
+          throw new Error(
+            `Invalid UUID format for Seller ID: ${data.sellerId}. Please select a valid seller.`,
+          );
+        }
+
+        if (id) {
+          // Update existing contract
+          await contractsStore.update(id, data);
+          navigate("/contracts");
+        } else {
+          // For new contracts, ensure we're passing all required fields
+          const contractData = {
+            ...initialFormData,
+            ...data,
+          };
+
+          // Double-check required fields before submission
+          const requiredFields: (keyof ContractFormData)[] = [
+            "buyerId",
+            "sellerId",
+            "type",
+            "productType",
+            "incoterm",
+            "quantity",
+            "allowedVariance",
+            "unitPrice",
+            "currency",
+            "paymentTerms",
+            "qualityFFA",
+            "qualityIV",
+            "qualityS",
+            "qualityM1",
+            "packingStandard",
+            "originCountry",
+            "deliveryCountry",
+            "deliveryPort",
+            "loadingStartDate",
+            "loadingPeriod",
+            "loadingDuration",
+            "deliveryDate",
+          ];
+
+          const missingFields = requiredFields.filter(
+            (field) => !contractData[field],
+          );
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          await contractsStore.create(contractData);
+          navigate("/contracts");
+        }
+      } catch (error) {
+        console.error("Error saving contract:", error);
+        // Display the detailed error to help with debugging
+        return Promise.reject(error);
       }
     },
-    [id, navigate],
+    [id, navigate, contractsStore],
   );
 
   const {
@@ -233,6 +298,11 @@ export default function ContractForm() {
       isDirty={isDirty}
       isSubmitting={isSubmitting}
     >
+      {errors.submit && (
+        <div className="mb-6 p-4 border border-red-300 bg-red-50 text-red-700 rounded-lg">
+          {errors.submit}
+        </div>
+      )}
       <FormSection title="Contract Type">
         <div className="grid grid-cols-2 gap-6">
           <div className="col-span-2">

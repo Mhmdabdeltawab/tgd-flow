@@ -30,10 +30,10 @@ import { getPortByName } from "../../common/data/ports";
 import { useImport } from "../../common/hooks/useImport";
 import { useConfirm } from "../../common/hooks/useConfirm";
 import ConfirmDialog from "../../common/components/ConfirmDialog/ConfirmDialog";
-import { contractsStore } from "../../common/stores/contractsStore";
-import { partyStore } from "../../common/stores/partyStore";
-import { documentStore } from "../../common/stores/documentStore";
-import { shipmentStore } from "../../common/stores/shipmentStore";
+import useSupabaseContractsStore from "../../common/stores/supabaseContractsStore";
+import useSupabasePartyStore from "../../common/stores/supabasePartyStore";
+import useSupabaseDocumentStore from "../../common/stores/supabaseDocumentStore";
+import useSupabaseShipmentStore from "../../common/stores/supabaseShipmentStore";
 import { Document } from "../../common/types/document";
 
 const defaultColumns: Column[] = [
@@ -99,7 +99,11 @@ const defaultColumns: Column[] = [
 
 export default function ContractsPage() {
   const navigate = useNavigate();
-  const [contracts, setContracts] = React.useState(contractsStore.getAll());
+  const [contracts, setContracts] = React.useState<any[]>([]);
+  const contractsStore = useSupabaseContractsStore();
+  const partyStore = useSupabasePartyStore();
+  const documentStore = useSupabaseDocumentStore();
+  const shipmentStore = useSupabaseShipmentStore();
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [selectedRow, setSelectedRow] = React.useState<any>(null);
   const [isColumnsOpen, setIsColumnsOpen] = React.useState(false);
@@ -117,7 +121,8 @@ export default function ContractsPage() {
   const handleImport = async (file: File) => {
     try {
       await importData(file);
-      setContracts(contractsStore.getAll());
+      const updatedContracts = await contractsStore.getAll();
+      setContracts(updatedContracts);
     } finally {
       if (!isImporting) {
         setIsImportOpen(false);
@@ -159,15 +164,21 @@ export default function ContractsPage() {
   const { printData } = usePrint(contracts);
   const { shareData } = useShare(contracts);
 
-  // Refresh contracts when they change in localStorage
+  // Fetch contracts from Supabase when component mounts
   React.useEffect(() => {
-    const handleStorageChange = () => {
-      setContracts(contractsStore.getAll());
+    const fetchContracts = async () => {
+      try {
+        console.log("Fetching all contracts from Supabase");
+        const contractsData = await contractsStore.getAll();
+        console.log("Contracts fetched:", contractsData);
+        setContracts(contractsData);
+      } catch (error) {
+        console.error("Error fetching contracts:", error);
+      }
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+    fetchContracts();
+  }, [contractsStore]);
 
   const {
     data: tableData,
@@ -212,33 +223,42 @@ export default function ContractsPage() {
     createFilterGroup("missingDocs", "Missing Documents", []),
   ];
 
-  const handleRowClick = (row: any) => {
-    // Get buyer and seller details including ISCC info
-    const buyer = row.buyerId
-      ? partyStore.getById("buyers", row.buyerId)
-      : null;
-    const seller = row.sellerId
-      ? partyStore.getById("suppliers", row.sellerId)
-      : null;
+  const handleRowClick = async (row: any) => {
+    try {
+      console.log("Row clicked:", row);
+      // Get buyer and seller details including ISCC info
+      const buyer = row.buyerId
+        ? await partyStore.getById("buyers", row.buyerId)
+        : null;
+      const seller = row.sellerId
+        ? await partyStore.getById("suppliers", row.sellerId)
+        : null;
 
-    // Get documents
-    const documents = documentStore.getByEntityId(row.id);
+      // Get documents
+      console.log("Fetching documents for contract:", row.id);
+      const documents = await documentStore.getByEntityId(row.id);
+      console.log("Documents fetched:", documents);
 
-    // Get shipments for this contract
-    const shipments = shipmentStore.getByContractId(row.id) || [];
+      // Get shipments for this contract
+      console.log("Fetching shipments for contract:", row.id);
+      const shipments = (await shipmentStore.getByContractId(row.id)) || [];
+      console.log("Shipments fetched:", shipments);
 
-    // Enhance row data with ISCC and documents
-    const enhancedRow = {
-      ...row,
-      buyerIscc: buyer?.isccNumber || null,
-      buyerIsccExpiry: buyer?.isccExpiry || null,
-      sellerIscc: seller?.isccNumber || null,
-      sellerIsccExpiry: seller?.isccExpiry || null,
-      documents,
-      shipments,
-    };
+      // Enhance row data with ISCC and documents
+      const enhancedRow = {
+        ...row,
+        buyerIscc: buyer?.isccNumber || null,
+        buyerIsccExpiry: buyer?.isccExpiry || null,
+        sellerIscc: seller?.isccNumber || null,
+        sellerIsccExpiry: seller?.isccExpiry || null,
+        documents,
+        shipments,
+      };
 
-    setSelectedRow(enhancedRow);
+      setSelectedRow(enhancedRow);
+    } catch (error) {
+      console.error("Error fetching related data:", error);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -252,9 +272,14 @@ export default function ContractsPage() {
     });
 
     if (confirmed) {
-      contractsStore.delete(id);
-      setContracts(contractsStore.getAll());
-      setSelectedRow(null);
+      try {
+        await contractsStore.delete(id);
+        const updatedContracts = await contractsStore.getAll();
+        setContracts(updatedContracts);
+        setSelectedRow(null);
+      } catch (error) {
+        console.error("Error deleting contract:", error);
+      }
     }
   };
 
