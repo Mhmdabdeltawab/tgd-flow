@@ -6,6 +6,8 @@ import Button from "../../common/components/Button/Button";
 import { useDebounce } from "../../common/hooks/useDebounce";
 import DeleteButton from "../../common/components/DeleteButton/DeleteButton";
 import useSupabaseAuthStore from "../../common/stores/supabaseAuthStore";
+import usePermissions from "../../common/hooks/usePermissions";
+import PermissionGuard from "../../common/components/Auth/PermissionGuard";
 
 interface UserManagementTableProps {
   users: User[];
@@ -45,6 +47,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
   const navigate = useNavigate();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const { canEdit, canDelete } = usePermissions();
 
   const filteredUsers = useMemo(() => {
     if (!debouncedSearchTerm) return users;
@@ -323,44 +326,54 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({
                   </div>
                 ) : (
                   <div className="flex space-x-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        onEditUser(user.id, user.permissions || {})
-                      }
-                      className="inline-flex items-center px-2.5 py-1.5 text-xs"
-                      disabled={
-                        (currentUser?.id === user.id &&
-                          currentUser?.role === "admin") ||
-                        savingUserId === user.id ||
-                        deletingUserId === user.id
-                      }
+                    <PermissionGuard
+                      resource="userManagement"
+                      permission="edit"
                     >
-                      {savingUserId === user.id ? (
-                        <>
-                          <div className="w-3 h-3 mr-1 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                          Loading...
-                        </>
-                      ) : (
-                        <>
-                          <Edit className="w-3 h-3 mr-1" />
-                          Quick Edit
-                        </>
-                      )}
-                    </Button>
-                    {onDeleteUser && (
-                      <DeleteButton
-                        id={user.id}
-                        resourceType="User"
-                        onDelete={handleDeleteUser}
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          onEditUser(user.id, user.permissions || {})
+                        }
+                        className="inline-flex items-center px-2.5 py-1.5 text-xs"
                         disabled={
-                          currentUser?.id === user.id ||
+                          (currentUser?.id === user.id &&
+                            currentUser?.role === "admin") ||
                           savingUserId === user.id ||
                           deletingUserId === user.id
                         }
-                        size="sm"
-                        checkPermission={false}
-                      />
+                      >
+                        {savingUserId === user.id ? (
+                          <>
+                            <div className="w-3 h-3 mr-1 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <Edit className="w-3 h-3 mr-1" />
+                            Quick Edit
+                          </>
+                        )}
+                      </Button>
+                    </PermissionGuard>
+                    {onDeleteUser && (
+                      <PermissionGuard
+                        resource="userManagement"
+                        permission="delete"
+                      >
+                        <DeleteButton
+                          id={user.id}
+                          resourceType="User"
+                          onDelete={handleDeleteUser}
+                          disabled={
+                            currentUser?.id === user.id ||
+                            savingUserId === user.id ||
+                            deletingUserId === user.id
+                          }
+                          size="sm"
+                          checkPermission={true}
+                        />
+                      </PermissionGuard>
                     )}
                   </div>
                 )}

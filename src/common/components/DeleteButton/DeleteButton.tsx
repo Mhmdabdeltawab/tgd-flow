@@ -35,6 +35,7 @@ export default function DeleteButton({
     !checkPermission || isAdmin() || canDelete(resourceType as any);
 
   if (!hasPermission) {
+    console.log(`User does not have permission to delete ${resourceType}`);
     return null;
   }
 
